@@ -1,7 +1,15 @@
 package com.redowan
 
+import com.lagradost.cloudstream3.HomePageResponse
+import com.lagradost.cloudstream3.MainPageRequest
+import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.mainPageOf
+import com.lagradost.cloudstream3.newAnimeSearchResponse
+import com.lagradost.cloudstream3.newHomePageResponse
+import com.lagradost.cloudstream3.addDubStatus
+import com.lagradost.cloudstream3.app
+import org.jsoup.nodes.Element
 
 class BdixDhakaFlix7Provider : BdixDhakaFlix14Provider() {
     override var mainUrl = "http://172.16.50.7"
@@ -95,4 +103,20 @@ class BdixDhakaFlix7Provider : BdixDhakaFlix14Provider() {
         "Kolkata Bangla Movies/(1999) & Before/" to "Kolkata Bangla Movies (Before 2000)",
         "Kolkata Bangla Movies/Satyajit Ray Films/" to "Satyajit Ray Films",
     )
+
+    private fun getPostResultWithPoster(post: Element): SearchResponse? {
+        val folderHtml = post.select("td.fb-n > a")
+        val isFolder = post.select("td.fb-i > img").attr("alt") == "folder"
+        if (!isFolder) return null
+        val name = folderHtml.text()
+        val url = mainUrl + folderHtml.attr("href")
+        val poster = "${url}a_AL_.jpg"
+        return newAnimeSearchResponse(name, url, TvType.Movie) {
+            this.posterUrl = poster
+            addDubStatus(
+                dubExist = "Dual" in name,
+                subExist = "ESub" in name
+            )
+        }
+    }
 }
