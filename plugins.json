@@ -1,0 +1,175 @@
+[
+    {
+        "iconUrl": "http://tv.bdiptv.net/assets/images/Live1.jpeg",
+        "fileHash": "sha256-867dc3a035e5b65b8d9cb5f41909cb685a7f6c33a16c98cbbb08aa355f4e4d53",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/r-shafi/BDIX-CloudStream",
+        "fileSize": 11711,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "Redowan"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 6,
+        "internalName": "BdixBdipTV",
+        "description": "BDIX Live Tv in Bangladesh",
+        "url": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/builds/BdixBdipTV.cs3",
+        "name": "BdixBdipTV"
+    },
+    {
+        "iconUrl": "http://new.circleftp.net/static/media/logo.fce2c9029060a10687b8.png",
+        "fileHash": "sha256-0f4e989a83da61db8ece3399d25b3c8d3e640a67dab5fe0b3f290f44f22a395b",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/r-shafi/BDIX-CloudStream",
+        "fileSize": 20597,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "Redowan"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AnimeMovie",
+            "OVA",
+            "Cartoon",
+            "AsianDrama",
+            "Others",
+            "Documentary"
+        ],
+        "version": 25,
+        "internalName": "BdixCircleftp",
+        "description": "Only works in Bangladesh. Works even in internet Shutdown",
+        "url": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/builds/BdixCircleftp.cs3",
+        "name": "BdixCircleftp"
+    },
+    {
+        "iconUrl": "https://dflix.discoveryftp.net/assets/images/icon.png",
+        "fileHash": "sha256-84c39299c6eaf4c219774bb00b6581d6a095e9bf298f2bf62217807cc6b9ce58",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/r-shafi/BDIX-CloudStream",
+        "fileSize": 19213,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "Redowan"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AnimeMovie",
+            "OVA",
+            "Cartoon",
+            "AsianDrama",
+            "Others",
+            "Documentary"
+        ],
+        "version": 8,
+        "internalName": "BdixDflix",
+        "description": "Discovery BDIX Provider",
+        "url": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/builds/BdixDflix.cs3",
+        "name": "BdixDflix"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/refs/heads/master/BdixDhakaFlix/icon.jpg",
+        "fileHash": "sha256-1618a94e2febd69a71b735cee6bbe0bb24269cdad9cfee880233354f53a345b8",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/r-shafi/BDIX-CloudStream",
+        "fileSize": 40472,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "Redowan"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AnimeMovie",
+            "OVA",
+            "Cartoon",
+            "AsianDrama",
+            "Others",
+            "Documentary"
+        ],
+        "version": 4,
+        "internalName": "BdixDhakaFlix",
+        "description": "Dhaka Flix BDIX Provider",
+        "url": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/builds/BdixDhakaFlix.cs3",
+        "name": "BdixDhakaFlix"
+    },
+    {
+        "iconUrl": "http://10.16.100.244/images/logo-purple.svg",
+        "fileHash": "sha256-e02b994729bebc5ffbc7a32efb2000adc76b303a315aa92f62174db71622ed37",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/r-shafi/BDIX-CloudStream",
+        "fileSize": 15664,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "Redowan"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AnimeMovie",
+            "OVA",
+            "Cartoon",
+            "AsianDrama",
+            "Others",
+            "Documentary"
+        ],
+        "version": 2,
+        "internalName": "BdixICCFtp",
+        "description": "ICC BDIX Provider",
+        "url": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/builds/BdixICCFtp.cs3",
+        "name": "BdixICCFtp"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/refs/heads/master/CtgFunMedia/icon.jpg",
+        "fileHash": "sha256-899df3fe2dea7c2df266acfc131bfae149010501991afe4ea543bce4824d7784",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/r-shafi/BDIX-CloudStream",
+        "fileSize": 24235,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "Redowan"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "CtgFunMedia",
+        "description": "CtgFun Media BDIX Provider",
+        "url": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/builds/CtgFunMedia.cs3",
+        "name": "CtgFunMedia"
+    },
+    {
+        "iconUrl": "http://srzone.live/uploads/system_logo/srzone-logo.png",
+        "fileHash": "sha256-144c054c6cbafe9e2171dc55f10fc0d6229e36bec80eb7362096af8d96e97074",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/r-shafi/BDIX-CloudStream",
+        "fileSize": 11272,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "r-shafi"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 2,
+        "internalName": "SrzoneLiveTV",
+        "description": "SRZone Live TV in Bangladesh",
+        "url": "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/builds/SrzoneLiveTV.cs3",
+        "name": "SrzoneLiveTV"
+    }
+]
