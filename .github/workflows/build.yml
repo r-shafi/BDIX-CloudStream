@@ -1,8 +1,11 @@
 name: Build
 
+permissions:
+  contents: write
+
 # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#concurrency
-concurrency: 
-  group: "build"
+concurrency:
+  group: 'build'
   cancel-in-progress: true
 
 on:
@@ -21,14 +24,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: "src"
+          path: 'src'
 
       - name: Checkout builds
         uses: actions/checkout@v4
         with:
-          ref: "builds"
-          path: "builds"
-      
+          ref: 'builds'
+          path: 'builds'
+
       - name: Clean old builds
         run: rm $GITHUB_WORKSPACE/builds/*.cs3 || true
 
