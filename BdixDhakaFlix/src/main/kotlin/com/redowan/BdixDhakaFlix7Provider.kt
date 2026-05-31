@@ -104,6 +104,16 @@ class BdixDhakaFlix7Provider : BdixDhakaFlix14Provider() {
         "Kolkata Bangla Movies/Satyajit Ray Films/" to "Satyajit Ray Films",
     )
 
+    override suspend fun getMainPage(
+        page: Int, request: MainPageRequest
+    ): HomePageResponse {
+        val doc = app.get("$mainUrl/$serverName/${request.data}").document
+        val home = doc.select("tbody > tr:gt(1)").mapNotNull { post ->
+            getPostResultWithPoster(post)
+        }
+        return newHomePageResponse(request.name, home, false)
+    }
+
     private fun getPostResultWithPoster(post: Element): SearchResponse? {
         val folderHtml = post.select("td.fb-n > a")
         val isFolder = post.select("td.fb-i > img").attr("alt") == "folder"
