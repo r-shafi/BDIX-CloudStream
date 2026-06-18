@@ -7,6 +7,7 @@ import android.content.Context
 @CloudstreamPlugin
 class BdixDhakaFlixPlugin: Plugin() {
     override fun load(context: Context) {
+        registerMainAPI(BdixDhakaFlixCombinedProvider())
         registerMainAPI(BdixDhakaFlix14Provider())
         registerMainAPI(BdixDhakaFlix7Provider())
         registerMainAPI(BdixDhakaFlix9Provider())
