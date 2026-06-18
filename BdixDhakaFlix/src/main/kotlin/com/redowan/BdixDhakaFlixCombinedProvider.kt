@@ -125,8 +125,20 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
             try {
                 val url = buildServerUrl(sp.server, sp.path)
                 val doc = app.get(url).document
-                doc.select("tbody > tr:gt(1)").mapNotNull { post ->
+                val topLevelFolders = doc.select("tbody > tr:gt(1)").mapNotNull { post ->
                     parsePostResult(post, sp.server)
+                }
+
+                topLevelFolders.flatMap { folder ->
+                    try {
+                        val subDoc = app.get(folder.url).document
+                        val subItems = subDoc.select("tbody > tr:gt(1)").mapNotNull { post ->
+                            parsePostResult(post, sp.server)
+                        }
+                        if (subItems.isNotEmpty()) subItems else listOf(folder)
+                    } catch (_: Exception) {
+                        listOf(folder)
+                    }
                 }
             } catch (_: Exception) {
                 emptyList<SearchResponse>()
