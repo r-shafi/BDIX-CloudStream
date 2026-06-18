@@ -20,9 +20,6 @@ import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.nodes.Element
@@ -124,20 +121,16 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         val paths = categoryMap.find { it.first == request.name }?.second
             ?: return newHomePageResponse(request.name, emptyList(), false)
 
-        val allResults = coroutineScope {
-            paths.map { sp ->
-                async {
-                    try {
-                        val url = buildServerUrl(sp.server, sp.path)
-                        val doc = app.get(url).document
-                        doc.select("tbody > tr:gt(1)").mapNotNull { post ->
-                            parsePostResult(post, sp.server)
-                        }
-                    } catch (_: Exception) {
-                        emptyList()
-                    }
+        val allResults = paths.flatMap { sp ->
+            try {
+                val url = buildServerUrl(sp.server, sp.path)
+                val doc = app.get(url).document
+                doc.select("tbody > tr:gt(1)").mapNotNull { post ->
+                    parsePostResult(post, sp.server)
                 }
-            }.awaitAll().flatten()
+            } catch (_: Exception) {
+                emptyList<SearchResponse>()
+            }
         }
 
         return newHomePageResponse(request.name, allResults, false)
@@ -166,16 +159,12 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val allResults = coroutineScope {
-            servers.map { server ->
-                async {
-                    try {
-                        searchOnServer(query, server)
-                    } catch (_: Exception) {
-                        emptyList()
-                    }
-                }
-            }.awaitAll().flatten()
+        val allResults = servers.flatMap { server ->
+            try {
+                searchOnServer(query, server)
+            } catch (_: Exception) {
+                emptyList<SearchResponse>()
+            }
         }
         return allResults.distinctBy { it.name }.take(40)
     }
@@ -283,15 +272,10 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
             } else null
         }
 
-        val response = LoadResponse(
-            name = title,
-            url = url,
-            type = TvType.Movie,
-            data = url
-        )
-        response.posterUrl = imageLink
-        response.recommendations = subItems
-        return response
+        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+            this.posterUrl = imageLink
+            this.recommendations = subItems
+        }
     }
 
     private suspend fun seasonExtractor(
