@@ -64,13 +64,6 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
             ServerPath(servers[0], "English Movies/", levels = 1),
             ServerPath(servers[3], "English Movies (1080p)/", levels = 1),
         ),
-        "Indian Movies" to listOf(
-            ServerPath(servers[0], "Kolkata Bangla Movies/", levels = 1),        // -> year -> movie
-            ServerPath(servers[0], "Foreign Language Movies/Bangla Dubbing Movies/"), // -> movie folders directly
-            ServerPath(servers[3], "Hindi Movies/", levels = 1),                 // -> year -> movie
-            ServerPath(servers[3], "SOUTH INDIAN MOVIES/Hindi Dubbed/", levels = 1), // -> year -> movie
-            ServerPath(servers[3], "SOUTH INDIAN MOVIES/South Movies/", levels = 1), // -> year -> movie
-        ),
         "Animation Movies" to listOf(
             ServerPath(servers[3], "Animation Movies (1080p)/"),                 // -> movie folders directly
         ),
@@ -100,6 +93,13 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         ),
         "Awards & TV Shows" to listOf(
             ServerPath(servers[1], "Awards %26 TV Shows/", levels = 1),          // -> section -> shows
+        ),
+        "Indian Movies" to listOf(
+            ServerPath(servers[0], "Kolkata Bangla Movies/", levels = 1),        // -> year -> movie
+            ServerPath(servers[0], "Foreign Language Movies/Bangla Dubbing Movies/"), // -> movie folders directly
+            ServerPath(servers[3], "Hindi Movies/", levels = 1),                 // -> year -> movie
+            ServerPath(servers[3], "SOUTH INDIAN MOVIES/Hindi Dubbed/", levels = 1), // -> year -> movie
+            ServerPath(servers[3], "SOUTH INDIAN MOVIES/South Movies/", levels = 1), // -> year -> movie
         ),
         "Tutorials" to listOf(
             ServerPath(servers[1], "Tutorial/"),                                 // -> tutorial folders directly
@@ -182,6 +182,10 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         val title = folderHtml.text()
         val url = server.url + folderHtml.attr("href")
         return newAnimeSearchResponse(title, url, TvType.Movie) {
+            // Folder URLs end in "/", so this points at the auto-generated thumbnail inside
+            // the movie/TV folder. Same convention load() falls back to, so home-grid
+            // posters match the detail view without an extra request per item.
+            this.posterUrl = if (server.useAltPoster) "${url}a11.jpg" else "${url}a_AL_.jpg"
             addDubStatus(
                 dubExist = "Dual" in title || "Multi" in title,
                 subExist = "ESub" in title || "MSubs" in title
