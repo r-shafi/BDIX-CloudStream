@@ -19,12 +19,8 @@ import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.amap
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.nodes.Element
@@ -125,9 +121,8 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         *categoryMap.map { (n, _) -> n to n }.toTypedArray()
     )
 
-    // Limit how many requests run at once and how many category folders are descended
-    // per level, so a deep/wide directory can't fire hundreds of requests and stall.
-    private val maxConcurrentRequests = 12
+    // Cap how many category folders are descended per level so a wide directory can't
+    // fire hundreds of requests and stall the page.
     private val maxBranchesPerLevel = 60
 
     override suspend fun getMainPage(
@@ -136,18 +131,14 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         val paths = categoryMap.find { it.first == request.name }?.second
             ?: return newHomePageResponse(request.name, emptyList(), false)
 
-        val semaphore = Semaphore(maxConcurrentRequests)
-
-        val allResults = coroutineScope {
-            paths.map { sp ->
-                async {
-                    try {
-                        flattenToDepth(buildServerUrl(sp.server, sp.path), sp.server, sp.levels, semaphore)
-                    } catch (_: Exception) {
-                        emptyList<SearchResponse>()
-                    }
-                }
-            }.awaitAll().flatten()
+        // Paths run sequentially (each one already fans out in parallel internally), which
+        // keeps the number of simultaneous requests bounded for multi-path categories.
+        val allResults = paths.flatMap { sp ->
+            try {
+                flattenToDepth(buildServerUrl(sp.server, sp.path), sp.server, sp.levels)
+            } catch (_: Exception) {
+                emptyList<SearchResponse>()
+            }
         }
 
         return newHomePageResponse(request.name, allResults, false)
@@ -157,25 +148,23 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
     // items. At `levels == 0` the current directory's folders are the movie/TV folders we
     // want to show, so they are returned directly without descending into them.
     private suspend fun flattenToDepth(
-        url: String, server: ServerConfig, levels: Int, semaphore: Semaphore
+        url: String, server: ServerConfig, levels: Int
     ): List<SearchResponse> {
-        val doc = semaphore.withPermit { app.get(url).document }
+        val doc = app.get(url).document
         val childFolders = doc.select("tbody > tr:gt(1)").mapNotNull { post ->
             parsePostResult(post, server)
         }
         if (levels <= 0) return childFolders
 
-        return coroutineScope {
-            childFolders.take(maxBranchesPerLevel).map { folder ->
-                async {
-                    try {
-                        flattenToDepth(folder.url, server, levels - 1, semaphore)
-                    } catch (_: Exception) {
-                        emptyList<SearchResponse>()
-                    }
-                }
-            }.awaitAll().flatten()
-        }
+        // amap (from cloudstream's library) fans these out in parallel; a failed branch
+        // resolves to an empty list so one bad sub-folder can't blank out the whole row.
+        return childFolders.take(maxBranchesPerLevel).amap { folder ->
+            try {
+                flattenToDepth(folder.url, server, levels - 1)
+            } catch (_: Exception) {
+                emptyList<SearchResponse>()
+            }
+        }.flatten()
     }
 
     private fun buildServerUrl(server: ServerConfig, path: String): String {
