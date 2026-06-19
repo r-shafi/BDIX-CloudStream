@@ -20,6 +20,11 @@ import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.nodes.Element
@@ -34,7 +39,11 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         val useAltPoster: Boolean = false
     )
 
-    private data class ServerPath(val server: ServerConfig, val path: String)
+    // `levels` = how many intermediate category folders sit between this path and the
+    // actual movie/TV folders (the ones containing media files). The home page descends
+    // exactly this many levels so each row shows playable movie/TV folders, never the
+    // in-between category folders (years, languages, alphabetical groups, sections).
+    private data class ServerPath(val server: ServerConfig, val path: String, val levels: Int = 0)
 
     private val servers = listOf(
         ServerConfig("http://172.16.50.7", "DHAKA-FLIX-7"),
@@ -55,48 +64,49 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
 
     private val categoryMap = listOf(
         "English Movies" to listOf(
-            ServerPath(servers[0], "English Movies/"),
-            ServerPath(servers[3], "English Movies (1080p)/"),
+            // -> year folders -> movie folders
+            ServerPath(servers[0], "English Movies/", levels = 1),
+            ServerPath(servers[3], "English Movies (1080p)/", levels = 1),
         ),
         "Indian Movies" to listOf(
-            ServerPath(servers[0], "Kolkata Bangla Movies/"),
-            ServerPath(servers[0], "Foreign Language Movies/Bangla Dubbing Movies/"),
-            ServerPath(servers[3], "Hindi Movies/"),
-            ServerPath(servers[3], "SOUTH INDIAN MOVIES/Hindi Dubbed/"),
-            ServerPath(servers[3], "SOUTH INDIAN MOVIES/South Movies/"),
+            ServerPath(servers[0], "Kolkata Bangla Movies/", levels = 1),        // -> year -> movie
+            ServerPath(servers[0], "Foreign Language Movies/Bangla Dubbing Movies/"), // -> movie folders directly
+            ServerPath(servers[3], "Hindi Movies/", levels = 1),                 // -> year -> movie
+            ServerPath(servers[3], "SOUTH INDIAN MOVIES/Hindi Dubbed/", levels = 1), // -> year -> movie
+            ServerPath(servers[3], "SOUTH INDIAN MOVIES/South Movies/", levels = 1), // -> year -> movie
         ),
         "Animation Movies" to listOf(
-            ServerPath(servers[3], "Animation Movies (1080p)/"),
+            ServerPath(servers[3], "Animation Movies (1080p)/"),                 // -> movie folders directly
         ),
         "Foreign Language Movies" to listOf(
-            ServerPath(servers[0], "Foreign Language Movies/"),
+            ServerPath(servers[0], "Foreign Language Movies/", levels = 1),      // -> language -> movie
         ),
         "IMDb Top-250 Movies" to listOf(
-            ServerPath(servers[3], "IMDb Top-250 Movies/"),
+            ServerPath(servers[3], "IMDb Top-250 Movies/"),                      // -> movie folders directly
         ),
         "Korean TV & WEB Series" to listOf(
-            ServerPath(servers[3], "KOREAN TV %26 WEB Series/"),
+            ServerPath(servers[3], "KOREAN TV %26 WEB Series/"),                 // -> series folders directly
         ),
         "Anime & Cartoon TV Series" to listOf(
-            ServerPath(servers[1], "Anime %26 Cartoon TV Series/"),
+            ServerPath(servers[1], "Anime %26 Cartoon TV Series/", levels = 1),  // -> alphabetical group -> series
         ),
         "Documentary" to listOf(
-            ServerPath(servers[1], "Documentary/"),
+            ServerPath(servers[1], "Documentary/"),                              // -> series folders directly
         ),
         "WWE & AEW Wrestling" to listOf(
-            ServerPath(servers[1], "WWE %26 AEW Wrestling/"),
+            ServerPath(servers[1], "WWE %26 AEW Wrestling/", levels = 1),        // -> WWE/AEW section -> shows
         ),
         "TV Series" to listOf(
-            ServerPath(servers[2], "TV-WEB-Series/"),
+            ServerPath(servers[2], "TV-WEB-Series/", levels = 1),               // -> alphabetical group -> series
         ),
         "3D Movies" to listOf(
-            ServerPath(servers[0], "3D Movies/"),
+            ServerPath(servers[0], "3D Movies/"),                                // -> movie folders directly
         ),
         "Awards & TV Shows" to listOf(
-            ServerPath(servers[1], "Awards %26 TV Shows/"),
+            ServerPath(servers[1], "Awards %26 TV Shows/", levels = 1),          // -> section -> shows
         ),
         "Tutorials" to listOf(
-            ServerPath(servers[1], "Tutorial/"),
+            ServerPath(servers[1], "Tutorial/"),                                 // -> tutorial folders directly
         ),
     )
 
@@ -115,37 +125,57 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         *categoryMap.map { (n, _) -> n to n }.toTypedArray()
     )
 
+    // Limit how many requests run at once and how many category folders are descended
+    // per level, so a deep/wide directory can't fire hundreds of requests and stall.
+    private val maxConcurrentRequests = 12
+    private val maxBranchesPerLevel = 60
+
     override suspend fun getMainPage(
         page: Int, request: MainPageRequest
     ): HomePageResponse {
         val paths = categoryMap.find { it.first == request.name }?.second
             ?: return newHomePageResponse(request.name, emptyList(), false)
 
-        val allResults = paths.flatMap { sp ->
-            try {
-                val url = buildServerUrl(sp.server, sp.path)
-                val doc = app.get(url).document
-                val topLevelFolders = doc.select("tbody > tr:gt(1)").mapNotNull { post ->
-                    parsePostResult(post, sp.server)
-                }
+        val semaphore = Semaphore(maxConcurrentRequests)
 
-                topLevelFolders.flatMap { folder ->
+        val allResults = coroutineScope {
+            paths.map { sp ->
+                async {
                     try {
-                        val subDoc = app.get(folder.url).document
-                        val subItems = subDoc.select("tbody > tr:gt(1)").mapNotNull { post ->
-                            parsePostResult(post, sp.server)
-                        }
-                        if (subItems.isNotEmpty()) subItems else listOf(folder)
+                        flattenToDepth(buildServerUrl(sp.server, sp.path), sp.server, sp.levels, semaphore)
                     } catch (_: Exception) {
-                        listOf(folder)
+                        emptyList<SearchResponse>()
                     }
                 }
-            } catch (_: Exception) {
-                emptyList<SearchResponse>()
-            }
+            }.awaitAll().flatten()
         }
 
         return newHomePageResponse(request.name, allResults, false)
+    }
+
+    // Descend exactly `levels` category folders, then return the folders at that level as
+    // items. At `levels == 0` the current directory's folders are the movie/TV folders we
+    // want to show, so they are returned directly without descending into them.
+    private suspend fun flattenToDepth(
+        url: String, server: ServerConfig, levels: Int, semaphore: Semaphore
+    ): List<SearchResponse> {
+        val doc = semaphore.withPermit { app.get(url).document }
+        val childFolders = doc.select("tbody > tr:gt(1)").mapNotNull { post ->
+            parsePostResult(post, server)
+        }
+        if (levels <= 0) return childFolders
+
+        return coroutineScope {
+            childFolders.take(maxBranchesPerLevel).map { folder ->
+                async {
+                    try {
+                        flattenToDepth(folder.url, server, levels - 1, semaphore)
+                    } catch (_: Exception) {
+                        emptyList<SearchResponse>()
+                    }
+                }
+            }.awaitAll().flatten()
+        }
     }
 
     private fun buildServerUrl(server: ServerConfig, path: String): String {
