@@ -21,6 +21,9 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.amap
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.SearchQuality
+import com.lagradost.cloudstream3.SeasonData
+import com.lagradost.cloudstream3.addSeasonNames
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.nodes.Element
@@ -181,11 +184,14 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
         if (!isFolder) return null
         val title = folderHtml.text()
         val url = server.url + folderHtml.attr("href")
-        return newAnimeSearchResponse(title, url, TvType.Movie) {
+        val tvType = if (isTvSeriesUrl(url)) TvType.TvSeries else TvType.Movie
+        return newAnimeSearchResponse(title, url, tvType) {
             // Folder URLs end in "/", so this points at the auto-generated thumbnail inside
             // the movie/TV folder. Same convention load() falls back to, so home-grid
             // posters match the detail view without an extra request per item.
             this.posterUrl = if (server.useAltPoster) "${url}a11.jpg" else "${url}a_AL_.jpg"
+            this.year = extractYear(title)
+            this.quality = extractQuality(title)
             addDubStatus(
                 dubExist = "Dual" in title || "Multi" in title,
                 subExist = "ESub" in title || "MSubs" in title
@@ -215,7 +221,10 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
             .map { post ->
                 val fullUrl = server.url + post.href
                 val title = nameFromUrl(post.href)
-                newAnimeSearchResponse(title, fullUrl) {
+                val tvType = if (isTvSeriesUrl(fullUrl)) TvType.TvSeries else TvType.Movie
+                newAnimeSearchResponse(title, fullUrl, tvType) {
+                    this.year = extractYear(title)
+                    this.quality = extractQuality(title)
                     addDubStatus(
                         dubExist = "Dual" in title || "Multi" in title,
                         subExist = "ESub" in title || "MSubs" in title
@@ -223,6 +232,22 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
                 }
             }
     }
+
+    private val yearRegex = Regex("""\((\d{4})""")
+    private fun extractYear(name: String): Int? =
+        yearRegex.find(name)?.groupValues?.get(1)?.toIntOrNull()
+
+    private fun extractQuality(name: String): SearchQuality? = when {
+        "4K" in name || "2160p" in name -> SearchQuality.FourK
+        "1080p" in name -> SearchQuality.HD
+        "720p" in name -> SearchQuality.HD
+        "480p" in name -> SearchQuality.SD
+        else -> null
+    }
+
+    private val tagRegex = Regex("""\[([^\]]+)\]""")
+    private fun extractTags(name: String): List<String>? =
+        tagRegex.findAll(name).map { it.groupValues[1] }.toList().ifEmpty { null }
 
     private val nameRegex = Regex(""".*/([^/]+)(?:/[^/]*)*$""")
 
@@ -261,12 +286,14 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
 
         if (isTvSeriesUrl(url)) {
             val episodesData = mutableListOf<Episode>()
+            val seasonNames = mutableListOf<SeasonData>()
             var seasonNum = 0
             tableHtml.forEach {
                 seasonNum++
                 val aHtml = it.selectFirst("td.fb-n > a")
                 val link = server.url + aHtml?.attr("href")
                 if (it.selectFirst("td.fb-i > img")?.attr("alt") == "folder") {
+                    seasonNames.add(SeasonData(season = seasonNum, name = aHtml?.text()))
                     seasonExtractor(link, episodesData, seasonNum, server)
                 } else if (aHtml?.selectFirst("a[href~=(?i)\\.(mkv|mp4)]") != null) {
                     val epName = aHtml.text()
@@ -280,6 +307,9 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
             }
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodesData) {
                 this.posterUrl = imageLink
+                this.year = extractYear(title)
+                this.tags = extractTags(title)
+                if (seasonNames.isNotEmpty()) addSeasonNames(seasonNames)
             }
         }
 
@@ -289,6 +319,8 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
             val link = server.url + folderHtml.attr("href")
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, link) {
                 this.posterUrl = imageLink
+                this.year = extractYear(movieTitle)
+                this.tags = extractTags(movieTitle)
             }
         }
 
@@ -299,6 +331,8 @@ class BdixDhakaFlixCombinedProvider : MainAPI() {
                 val name = a.text()
                 val subUrl = server.url + a.attr("href")
                 newAnimeSearchResponse(name, subUrl, TvType.Movie) {
+                    this.year = extractYear(name)
+                    this.quality = extractQuality(name)
                     addDubStatus(
                         dubExist = "Dual" in name || "Multi" in name,
                         subExist = "ESub" in name || "MSubs" in name
