@@ -41,7 +41,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val limit = 30
+        val limit = 99999
         val results = when (request.data) {
             "movies" -> {
                 val json = app.get(
@@ -99,7 +99,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val results = mutableListOf<SearchResponse>()
 
         val moviesJson = app.get(
-            "$mainUrl/api/v1/movies.php?sort_by=uploadTime+DESC&limit=50",
+            "$mainUrl/api/v1/movies.php?sort_by=uploadTime+DESC&limit=99999",
             verify = false,
             cacheTime = 60
         ).text
@@ -112,7 +112,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         }
 
         val tvShowsJson = app.get(
-            "$mainUrl/api/v1/tvshows.php?limit=50&sort_by=uploadTime+DESC",
+            "$mainUrl/api/v1/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
             verify = false,
             cacheTime = 60
         ).text
@@ -133,7 +133,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         if (path.startsWith("/movie/")) {
             val movieId = path.removePrefix("/movie/")
             val json = app.get(
-                "$mainUrl/api/v1/movies.php?sort_by=uploadTime+DESC&limit=100",
+                "$mainUrl/api/v1/movies.php?sort_by=uploadTime+DESC&limit=99999",
                 verify = false,
                 cacheTime = 60
             ).text
@@ -164,7 +164,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         if (path.startsWith("/tvshow/")) {
             val tvShowId = path.removePrefix("/tvshow/")
             val json = app.get(
-                "$mainUrl/api/v1/tvshows.php?limit=100&sort_by=uploadTime+DESC",
+                "$mainUrl/api/v1/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
                 verify = false,
                 cacheTime = 60
             ).text
