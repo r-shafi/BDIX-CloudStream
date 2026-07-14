@@ -15,6 +15,7 @@ import com.lagradost.cloudstream3.newEpisode
 import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
+import com.lagradost.cloudstream3.Score
 import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
@@ -105,7 +106,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val movies = AppUtils.parseJson<List<MovieData>>(moviesJson)
         movies.filter {
             it.MovieTitle.contains(query, ignoreCase = true) ||
-            it.MovieCategory.contains(query, ignoreCase = true)
+            it.MovieCategory?.contains(query, ignoreCase = true)
         }.forEach { movie ->
             toMovieSearchResult(movie).let { results.add(it) }
         }
@@ -118,7 +119,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val tvShows = AppUtils.parseJson<List<TvShowData>>(tvShowsJson)
         tvShows.filter {
             it.TVtitle.contains(query, ignoreCase = true) ||
-            it.TVcategory.contains(query, ignoreCase = true)
+            it.TVcategory?.contains(query, ignoreCase = true)
         }.forEach { tvShow ->
             toTvShowSearchResult(tvShow).let { results.add(it) }
         }
@@ -154,10 +155,8 @@ class ArrowNetMovieTVProvider : MainAPI() {
                 this.backgroundPosterUrl = backgroundPosterUrl
                 this.year = movie.MovieYear?.toIntOrNull()
                 this.plot = movie.MovieStory
-                this.rating = movie.MovieRatings?.toFloatOrNull()?.times(1000)?.toInt()
+                this.score = movie.MovieRatings?.let { Score.from(it, 10) }
                 this.duration = movie.MovieRuntime?.toIntOrNull()?.times(60000)
-                this.quality = getQualityFromString(movie.MovieQuality)
-                this.released = movie.MovieDate
                 this.tags = listOfNotNull(movie.MovieCategory, movie.Movielang).filter { it.isNotBlank() }
             }
         }
@@ -206,7 +205,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
                 this.posterUrl = posterUrl
                 this.year = tvShow.TVrelease?.toIntOrNull()
                 this.plot = tvShow.TVstory
-                this.rating = tvShow.TVRatings?.toFloatOrNull()?.times(1000)?.toInt()
+                this.score = tvShow.TVRatings?.let { Score.from(it, 10) }
                 this.tags = listOfNotNull(tvShow.TVcategory, tvShow.TVgenre).filter { it.isNotBlank() }
             }
         }
