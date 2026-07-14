@@ -106,7 +106,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val movies = AppUtils.parseJson<List<MovieData>>(moviesJson)
         movies.filter {
             it.MovieTitle.contains(query, ignoreCase = true) ||
-            it.MovieCategory?.contains(query, ignoreCase = true)
+            it.MovieCategory?.contains(query, ignoreCase = true) == true
         }.forEach { movie ->
             toMovieSearchResult(movie).let { results.add(it) }
         }
@@ -119,7 +119,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val tvShows = AppUtils.parseJson<List<TvShowData>>(tvShowsJson)
         tvShows.filter {
             it.TVtitle.contains(query, ignoreCase = true) ||
-            it.TVcategory?.contains(query, ignoreCase = true)
+            it.TVcategory?.contains(query, ignoreCase = true) == true
         }.forEach { tvShow ->
             toTvShowSearchResult(tvShow).let { results.add(it) }
         }
