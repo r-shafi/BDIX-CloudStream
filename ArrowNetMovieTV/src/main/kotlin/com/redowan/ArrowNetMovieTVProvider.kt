@@ -70,7 +70,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
                     "$apiBaseUrl/movies.php?category=$category&sort_by=uploadTime+DESC&limit=$limit",
                     verify = false,
                     cacheTime = 60
-                ).text
+                ).body!!.textLarge
                 val movies = AppUtils.parseJson<List<MovieData>>(json)
                 movies.mapNotNull { toMovieSearchResult(it) }
             }
@@ -80,7 +80,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
                     "$apiBaseUrl/tvshows.php?category=$category&limit=$limit&sort_by=uploadTime+DESC",
                     verify = false,
                     cacheTime = 60
-                ).text
+                ).body!!.textLarge
                 val tvShows = AppUtils.parseJson<List<TvShowData>>(json)
                 tvShows.mapNotNull { toTvShowSearchResult(it) }
             }
@@ -92,9 +92,10 @@ class ArrowNetMovieTVProvider : MainAPI() {
 
     private fun toMovieSearchResult(movie: MovieData): SearchResponse? {
         val posterUrl = if (!movie.poster.isNullOrBlank()) "$posterBaseUrl/${movie.poster}" else null
+        val id = movie.MovieID ?: return null
         return newAnimeSearchResponse(
             "${movie.MovieTitle.trim()} (${movie.MovieYear})",
-            "$mainUrl/movie/${movie.id}",
+            "$mainUrl/movie/$id",
             TvType.Movie
         ) {
             this.posterUrl = posterUrl
@@ -105,9 +106,10 @@ class ArrowNetMovieTVProvider : MainAPI() {
 
     private fun toTvShowSearchResult(tvShow: TvShowData): SearchResponse? {
         val posterUrl = if (!tvShow.TVposter.isNullOrBlank()) "$posterBaseUrl/${tvShow.TVposter}" else null
+        val id = tvShow.TVID ?: return null
         return newAnimeSearchResponse(
             "${tvShow.TVtitle.trim()} (${tvShow.TVrelease})",
-            "$mainUrl/tvshow/${tvShow.id}",
+            "$mainUrl/tvshow/$id",
             TvType.TvSeries
         ) {
             this.posterUrl = posterUrl
@@ -118,31 +120,16 @@ class ArrowNetMovieTVProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
 
-        val moviesJson = app.get(
-            "$apiBaseUrl/movies.php?sort_by=uploadTime+DESC&limit=99999",
+        val json = app.get(
+            "$apiBaseUrl/search.php?search=$query",
             verify = false,
             cacheTime = 60
         ).text
-        val movies = AppUtils.parseJson<List<MovieData>>(moviesJson)
-        movies.filter {
-            it.MovieTitle.contains(query, ignoreCase = true) ||
-            it.MovieCategory?.contains(query, ignoreCase = true) == true
-        }.forEach { movie ->
-            toMovieSearchResult(movie)?.let { results.add(it) }
-        }
 
-        val tvShowsJson = app.get(
-            "$apiBaseUrl/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
-            verify = false,
-            cacheTime = 60
-        ).text
-        val tvShows = AppUtils.parseJson<List<TvShowData>>(tvShowsJson)
-        tvShows.filter {
-            it.TVtitle.contains(query, ignoreCase = true) ||
-            it.TVcategory?.contains(query, ignoreCase = true) == true
-        }.forEach { tvShow ->
-            toTvShowSearchResult(tvShow)?.let { results.add(it) }
-        }
+        try {
+            val movies = AppUtils.parseJson<List<MovieData>>(json)
+            movies.mapNotNull { toMovieSearchResult(it) }.let { results.addAll(it) }
+        } catch (_: Exception) {}
 
         return results
     }
@@ -151,14 +138,14 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val path = url.removePrefix(mainUrl)
 
         if (path.startsWith("/movie/")) {
-            val movieId = path.removePrefix("/movie/")
+            val id = path.removePrefix("/movie/")
             val json = app.get(
-                "$apiBaseUrl/movies.php?sort_by=uploadTime+DESC&limit=99999",
+                "$apiBaseUrl/byid.php?id=$id",
                 verify = false,
                 cacheTime = 60
             ).text
             val movies = AppUtils.parseJson<List<MovieData>>(json)
-            val movie = movies.find { it.id == movieId }
+            val movie = movies.firstOrNull()
                 ?: return newMovieLoadResponse("Unknown", url, TvType.Movie, url)
 
             val posterUrl = if (!movie.poster.isNullOrBlank()) "$posterBaseUrl/${movie.poster}" else null
@@ -181,14 +168,14 @@ class ArrowNetMovieTVProvider : MainAPI() {
         }
 
         if (path.startsWith("/tvshow/")) {
-            val tvShowId = path.removePrefix("/tvshow/")
+            val id = path.removePrefix("/tvshow/")
             val json = app.get(
-                "$apiBaseUrl/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
+                "$apiBaseUrl/byid.php?id=$id",
                 verify = false,
                 cacheTime = 60
             ).text
             val tvShows = AppUtils.parseJson<List<TvShowData>>(json)
-            val tvShow = tvShows.find { it.id == tvShowId }
+            val tvShow = tvShows.firstOrNull()
                 ?: return newTvSeriesLoadResponse("Unknown", url, TvType.TvSeries, emptyList())
 
             val posterUrl = if (!tvShow.TVposter.isNullOrBlank()) "$posterBaseUrl/${tvShow.TVposter}" else null
