@@ -70,7 +70,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
                     "$apiBaseUrl/movies.php?category=$category&sort_by=uploadTime+DESC&limit=$limit",
                     verify = false,
                     cacheTime = 60
-                ).body!!.textLarge
+                ).body?.string()
                 val movies = AppUtils.parseJson<List<MovieData>>(json)
                 movies.mapNotNull { toMovieSearchResult(it) }
             }
@@ -80,7 +80,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
                     "$apiBaseUrl/tvshows.php?category=$category&limit=$limit&sort_by=uploadTime+DESC",
                     verify = false,
                     cacheTime = 60
-                ).body!!.textLarge
+                ).body?.string()
                 val tvShows = AppUtils.parseJson<List<TvShowData>>(json)
                 tvShows.mapNotNull { toTvShowSearchResult(it) }
             }
