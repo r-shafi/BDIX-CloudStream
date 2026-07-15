@@ -318,7 +318,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val TVactors: String?,
         val TVposter: String?,
         val TVbackdrops: String?,
-        val FileLocation: String,
+        val FileLocation: String?,
         val uploadedUser: String?,
         val uploadTime: String?,
         val views: String?,
