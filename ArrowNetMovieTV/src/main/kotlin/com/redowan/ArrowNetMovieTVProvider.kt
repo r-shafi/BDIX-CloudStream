@@ -5,9 +5,12 @@ import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MainPageRequest
+import com.lagradost.cloudstream3.SearchQuality
 import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.SeasonData
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.addSeasonNames
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.mainPageOf
 import com.lagradost.cloudstream3.newAnimeSearchResponse
@@ -31,10 +34,26 @@ class ArrowNetMovieTVProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     private val posterBaseUrl = "https://image.tmdb.org/t/p/w500"
+    private val apiBaseUrl get() = "$mainUrl/api/v1"
+
+    // Movie categories from menu.php (parent: movies) - movies first
+    private val movieCategories = listOf(
+        "Hollywood", "Bollywood", "Animation", "Foreign", "French", "Chinese",
+        "Indian Bangla", "Italian", "Japanese", "Korean", "Malayalam", "Russia",
+        "Tamil", "Thailand", "Turkey", "Hong-Kong", "Spanish", "Pakistani",
+        "Germany", "3D Movie", "Brasil", "Persian", "Hindi Dubbed",
+        "IMDB Top 250", "Panjabi", "Bangla"
+    )
+
+    // TV categories from menu.php (parent: Tv Series) - then TVs
+    private val tvCategories = listOf(
+        "English Tv Series", "Korean Tv Series", "Hindi Tv Series",
+        "Bengali Tv Series", "Arabic Tv Series", "Sinhalese TV"
+    )
 
     override val mainPage = mainPageOf(
-        "movies" to "Movies",
-        "tvshows" to "TV Shows"
+        *movieCategories.map { "movie_$it" to it }.toTypedArray(),
+        *tvCategories.map { "tv_$it" to it }.toTypedArray()
     )
 
     override suspend fun getMainPage(
@@ -42,35 +61,36 @@ class ArrowNetMovieTVProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val limit = 99999
-        val results = when (request.data) {
-            "movies" -> {
+        val data = request.data
+
+        val results = when {
+            data.startsWith("movie_") -> {
+                val category = data.removePrefix("movie_")
                 val json = app.get(
-                    "$mainUrl/api/v1/movies.php?sort_by=uploadTime+DESC&limit=$limit",
+                    "$apiBaseUrl/movies.php?category=$category&sort_by=uploadTime+DESC&limit=$limit",
                     verify = false,
                     cacheTime = 60
                 ).text
                 val movies = AppUtils.parseJson<List<MovieData>>(json)
-                movies.mapNotNull { movie ->
-                    toMovieSearchResult(movie)
-                }
+                movies.mapNotNull { toMovieSearchResult(it) }
             }
-            "tvshows" -> {
+            data.startsWith("tv_") -> {
+                val category = data.removePrefix("tv_")
                 val json = app.get(
-                    "$mainUrl/api/v1/tvshows.php?limit=$limit&sort_by=uploadTime+DESC",
+                    "$apiBaseUrl/tvshows.php?category=$category&limit=$limit&sort_by=uploadTime+DESC",
                     verify = false,
                     cacheTime = 60
                 ).text
                 val tvShows = AppUtils.parseJson<List<TvShowData>>(json)
-                tvShows.mapNotNull { tvShow ->
-                    toTvShowSearchResult(tvShow)
-                }
+                tvShows.mapNotNull { toTvShowSearchResult(it) }
             }
             else -> emptyList()
         }
-        return newHomePageResponse(request.name, results, true)
+
+        return newHomePageResponse(request.name, results, false)
     }
 
-    private fun toMovieSearchResult(movie: MovieData): SearchResponse {
+    private fun toMovieSearchResult(movie: MovieData): SearchResponse? {
         val posterUrl = if (!movie.poster.isNullOrBlank()) "$posterBaseUrl/${movie.poster}" else null
         return newAnimeSearchResponse(
             "${movie.MovieTitle.trim()} (${movie.MovieYear})",
@@ -83,7 +103,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         }
     }
 
-    private fun toTvShowSearchResult(tvShow: TvShowData): SearchResponse {
+    private fun toTvShowSearchResult(tvShow: TvShowData): SearchResponse? {
         val posterUrl = if (!tvShow.TVposter.isNullOrBlank()) "$posterBaseUrl/${tvShow.TVposter}" else null
         return newAnimeSearchResponse(
             "${tvShow.TVtitle.trim()} (${tvShow.TVrelease})",
@@ -99,7 +119,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val results = mutableListOf<SearchResponse>()
 
         val moviesJson = app.get(
-            "$mainUrl/api/v1/movies.php?sort_by=uploadTime+DESC&limit=99999",
+            "$apiBaseUrl/movies.php?sort_by=uploadTime+DESC&limit=99999",
             verify = false,
             cacheTime = 60
         ).text
@@ -108,11 +128,11 @@ class ArrowNetMovieTVProvider : MainAPI() {
             it.MovieTitle.contains(query, ignoreCase = true) ||
             it.MovieCategory?.contains(query, ignoreCase = true) == true
         }.forEach { movie ->
-            toMovieSearchResult(movie).let { results.add(it) }
+            toMovieSearchResult(movie)?.let { results.add(it) }
         }
 
         val tvShowsJson = app.get(
-            "$mainUrl/api/v1/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
+            "$apiBaseUrl/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
             verify = false,
             cacheTime = 60
         ).text
@@ -121,7 +141,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
             it.TVtitle.contains(query, ignoreCase = true) ||
             it.TVcategory?.contains(query, ignoreCase = true) == true
         }.forEach { tvShow ->
-            toTvShowSearchResult(tvShow).let { results.add(it) }
+            toTvShowSearchResult(tvShow)?.let { results.add(it) }
         }
 
         return results
@@ -133,7 +153,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         if (path.startsWith("/movie/")) {
             val movieId = path.removePrefix("/movie/")
             val json = app.get(
-                "$mainUrl/api/v1/movies.php?sort_by=uploadTime+DESC&limit=99999",
+                "$apiBaseUrl/movies.php?sort_by=uploadTime+DESC&limit=99999",
                 verify = false,
                 cacheTime = 60
             ).text
@@ -143,7 +163,6 @@ class ArrowNetMovieTVProvider : MainAPI() {
 
             val posterUrl = if (!movie.poster.isNullOrBlank()) "$posterBaseUrl/${movie.poster}" else null
             val backdropUrl = if (!movie.backdrops_Poster.isNullOrBlank()) "$posterBaseUrl/${movie.backdrops_Poster}" else null
-            val backgroundPosterUrl = backdropUrl ?: posterUrl
 
             return newMovieLoadResponse(
                 "${movie.MovieTitle.trim()} (${movie.MovieYear})",
@@ -152,7 +171,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
                 movie.MovieWatchLink
             ) {
                 this.posterUrl = posterUrl
-                this.backgroundPosterUrl = backgroundPosterUrl
+                this.backgroundPosterUrl = backdropUrl ?: posterUrl
                 this.year = movie.MovieYear?.toIntOrNull()
                 this.plot = movie.MovieStory
                 this.score = movie.MovieRatings?.let { Score.from(it, 10) }
@@ -164,7 +183,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
         if (path.startsWith("/tvshow/")) {
             val tvShowId = path.removePrefix("/tvshow/")
             val json = app.get(
-                "$mainUrl/api/v1/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
+                "$apiBaseUrl/tvshows.php?limit=99999&sort_by=uploadTime+DESC",
                 verify = false,
                 cacheTime = 60
             ).text
@@ -175,21 +194,31 @@ class ArrowNetMovieTVProvider : MainAPI() {
             val posterUrl = if (!tvShow.TVposter.isNullOrBlank()) "$posterBaseUrl/${tvShow.TVposter}" else null
 
             val episodes = mutableListOf<Episode>()
+            val seasonNames = mutableListOf<SeasonData>()
             try {
-                val dirUrl = "$mainUrl/${tvShow.FileLocation.trimStart('.', '/')}/"
-                val doc = app.get(dirUrl, verify = false).document
-                val links = doc.select("a[href\$=.mp4], a[href\$=.mkv]")
+                val episodesJson = app.get(
+                    "$apiBaseUrl/tvepisodes.php?TVID=${tvShow.TVID}",
+                    verify = false,
+                    cacheTime = 60
+                ).text
+                val episodeData = AppUtils.parseJson<List<TvEpisodeData>>(episodesJson)
 
-                var episodeNum = 0
-                links.forEach { link ->
-                    val href = link.attr("href")
-                    val name = link.text().ifBlank { href.substringAfterLast("/").substringBeforeLast(".") }
-                    if (href.isNotBlank()) {
-                        episodeNum++
-                        val fullUrl = if (href.startsWith("http")) href else "$mainUrl/${href.trimStart('/')}"
-                        episodes.add(newEpisode(fullUrl) {
-                            this.name = name
-                            this.episode = episodeNum
+                val groupedEpisodes = episodeData.groupBy { it.season_number?.toIntOrNull() ?: 1 }
+
+                groupedEpisodes.forEach { (seasonNum, seasonEpisodes) ->
+                    seasonNames.add(SeasonData(season = seasonNum, name = "Season $seasonNum"))
+
+                    seasonEpisodes.sortedBy { it.episode_number?.toIntOrNull() ?: 0 }.forEach { ep ->
+                        val watchUrl = ep.watchlink?.let { link ->
+                            if (link.startsWith("http")) link
+                            else "$mainUrl/${link.trimStart('.', '/')}"
+                        } ?: return@forEach
+
+                        episodes.add(newEpisode(watchUrl) {
+                            this.name = ep.name ?: "Episode ${ep.episode_number}"
+                            this.season = seasonNum
+                            this.episode = ep.episode_number?.toIntOrNull() ?: 0
+                            this.posterUrl = ep.still_path?.let { "$posterBaseUrl$it" }
                         })
                     }
                 }
@@ -207,6 +236,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
                 this.plot = tvShow.TVstory
                 this.score = tvShow.TVRatings?.let { Score.from(it, 10) }
                 this.tags = listOfNotNull(tvShow.TVcategory, tvShow.TVgenre).filter { it.isNotBlank() }
+                if (seasonNames.isNotEmpty()) addSeasonNames(seasonNames)
             }
         }
 
@@ -230,14 +260,14 @@ class ArrowNetMovieTVProvider : MainAPI() {
         return true
     }
 
-    private fun getQualityFromString(quality: String?): com.lagradost.cloudstream3.SearchQuality? {
+    private fun getQualityFromString(quality: String?): SearchQuality? {
         return when {
             quality.isNullOrBlank() -> null
-            quality.contains("CAM", ignoreCase = true) -> com.lagradost.cloudstream3.SearchQuality.Cam
-            quality.contains("HD-RIP", ignoreCase = true) -> com.lagradost.cloudstream3.SearchQuality.HD
-            quality.contains("BRRIP", ignoreCase = true) -> com.lagradost.cloudstream3.SearchQuality.BlueRay
-            quality.contains("WEBRIP", ignoreCase = true) -> com.lagradost.cloudstream3.SearchQuality.WebRip
-            quality.contains("DVD", ignoreCase = true) -> com.lagradost.cloudstream3.SearchQuality.DVD
+            quality.contains("CAM", ignoreCase = true) -> SearchQuality.Cam
+            quality.contains("HD-RIP", ignoreCase = true) -> SearchQuality.HD
+            quality.contains("BRRIP", ignoreCase = true) -> SearchQuality.BlueRay
+            quality.contains("WEBRIP", ignoreCase = true) -> SearchQuality.WebRip
+            quality.contains("DVD", ignoreCase = true) -> SearchQuality.DVD
             else -> null
         }
     }
@@ -296,5 +326,23 @@ class ArrowNetMovieTVProvider : MainAPI() {
         val completed: String?,
         val missing: String?,
         val last_air_date: String?
+    )
+
+    data class TvEpisodeData(
+        val id: String,
+        val TVID: String?,
+        val episode_number: String?,
+        val season_number: String?,
+        val EPIID: String?,
+        val name: String?,
+        val still_path: String?,
+        val overview: String?,
+        val quality: String?,
+        val watchlink: String?,
+        val air_date: String?,
+        val up_time: String?,
+        val hit: String?,
+        val upby: String?,
+        val published: String?
     )
 }
