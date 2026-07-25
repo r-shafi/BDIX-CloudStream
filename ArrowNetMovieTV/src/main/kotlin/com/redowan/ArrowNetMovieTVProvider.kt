@@ -36,24 +36,32 @@ class ArrowNetMovieTVProvider : MainAPI() {
     private val posterBaseUrl = "https://image.tmdb.org/t/p/w500"
     private val apiBaseUrl get() = "$mainUrl/api/v1"
 
-    // Movie categories from menu.php (parent: movies) - movies first
-    private val movieCategories = listOf(
-        "Hollywood", "Bollywood", "Animation", "Foreign", "French", "Chinese",
-        "Indian Bangla", "Italian", "Japanese", "Korean", "Malayalam", "Russia",
-        "Tamil", "Thailand", "Turkey", "Hong-Kong", "Spanish", "Pakistani",
-        "Germany", "3D Movie", "Brasil", "Persian", "Hindi Dubbed",
-        "IMDB Top 250", "Panjabi", "Bangla"
+    // Single categories (display name -> API category)
+    private val singleMovieCategories = mapOf(
+        "Hollywood" to "Hollywood",
+        "Animation" to "Animation",
+        "IMDB Top 250" to "IMDB Top 250"
     )
 
-    // TV categories from menu.php (parent: Tv Series) - then TVs
-    private val tvCategories = listOf(
-        "English Tv Series", "Korean Tv Series", "Hindi Tv Series",
-        "Bengali Tv Series", "Arabic Tv Series", "Sinhalese TV"
+    // Combined categories (display name -> list of API categories to merge)
+    private val combinedMovieCategories = mapOf(
+        "Indian Movies" to listOf("Bollywood", "Tamil", "Bangla")
+    )
+
+    private val singleTvCategories = mapOf(
+        "English Tv Series" to "English Tv Series",
+        "Korean Tv Series" to "Korean Tv Series"
+    )
+
+    private val combinedTvCategories = mapOf(
+        "Indian Tv Series" to listOf("Hindi Tv Series", "Bengali Tv Series")
     )
 
     override val mainPage = mainPageOf(
-        *movieCategories.map { "movie_$it" to it }.toTypedArray(),
-        *tvCategories.map { "tv_$it" to it }.toTypedArray()
+        *singleMovieCategories.keys.map { "movie_$it" to it }.toTypedArray(),
+        *combinedMovieCategories.keys.map { "movie_$it" to it }.toTypedArray(),
+        *singleTvCategories.keys.map { "tv_$it" to it }.toTypedArray(),
+        *combinedTvCategories.keys.map { "tv_$it" to it }.toTypedArray()
     )
 
     override suspend fun getMainPage(
@@ -62,27 +70,36 @@ class ArrowNetMovieTVProvider : MainAPI() {
     ): HomePageResponse {
         val limit = 99999
         val data = request.data
+        val displayName = data.removePrefix("movie_").removePrefix("tv_")
 
         val results = when {
             data.startsWith("movie_") -> {
-                val category = data.removePrefix("movie_")
-                val json = app.get(
-                    "$apiBaseUrl/movies.php?category=$category&sort_by=uploadTime+DESC&limit=$limit",
-                    verify = false,
-                    cacheTime = 60
-                ).body?.string() ?: ""
-                val movies = AppUtils.parseJson<List<MovieData>>(json)
-                movies.mapNotNull { toMovieSearchResult(it) }
+                val apiCategories = combinedMovieCategories[displayName]
+                    ?: listOf(singleMovieCategories[displayName] ?: displayName)
+                val allMovies = mutableListOf<MovieData>()
+                for (cat in apiCategories) {
+                    val json = app.get(
+                        "$apiBaseUrl/movies.php?category=$cat&sort_by=uploadTime+DESC&limit=$limit",
+                        verify = false,
+                        cacheTime = 60
+                    ).body?.string() ?: ""
+                    try { allMovies.addAll(AppUtils.parseJson(json)) } catch (_: Exception) {}
+                }
+                allMovies.mapNotNull { toMovieSearchResult(it) }
             }
             data.startsWith("tv_") -> {
-                val category = data.removePrefix("tv_")
-                val json = app.get(
-                    "$apiBaseUrl/tvshows.php?category=$category&limit=$limit&sort_by=uploadTime+DESC",
-                    verify = false,
-                    cacheTime = 60
-                ).body?.string() ?: ""
-                val tvShows = AppUtils.parseJson<List<TvShowData>>(json)
-                tvShows.mapNotNull { toTvShowSearchResult(it) }
+                val apiCategories = combinedTvCategories[displayName]
+                    ?: listOf(singleTvCategories[displayName] ?: displayName)
+                val allTvShows = mutableListOf<TvShowData>()
+                for (cat in apiCategories) {
+                    val json = app.get(
+                        "$apiBaseUrl/tvshows.php?category=$cat&limit=$limit&sort_by=uploadTime+DESC",
+                        verify = false,
+                        cacheTime = 60
+                    ).body?.string() ?: ""
+                    try { allTvShows.addAll(AppUtils.parseJson(json)) } catch (_: Exception) {}
+                }
+                allTvShows.mapNotNull { toTvShowSearchResult(it) }
             }
             else -> emptyList()
         }
@@ -184,7 +201,7 @@ class ArrowNetMovieTVProvider : MainAPI() {
             val seasonNames = mutableListOf<SeasonData>()
             try {
                 val episodesJson = app.get(
-                    "$apiBaseUrl/tvepisodes.php?TVID=${tvShow.TVID}",
+                    "$apiBaseUrl/tvepisodes.php?tvid=${tvShow.TVID}",
                     verify = false,
                     cacheTime = 60
                 ).text
