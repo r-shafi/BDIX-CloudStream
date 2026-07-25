@@ -38,7 +38,6 @@ class ArrowNetMovieTVProvider : MainAPI() {
 
     // Single categories (display name -> API category)
     private val singleMovieCategories = mapOf(
-        "Hollywood" to "Hollywood",
         "Animation" to "Animation",
         "IMDB Top 250" to "IMDB Top 250"
     )
@@ -46,6 +45,19 @@ class ArrowNetMovieTVProvider : MainAPI() {
     // Combined categories (display name -> list of API categories to merge)
     private val combinedMovieCategories = mapOf(
         "Indian Movies" to listOf("Bollywood", "Tamil", "Bangla")
+    )
+
+    // Genre-filtered categories: fetch from Hollywood, filter by primary genre
+    private val genreMovieCategories = mapOf(
+        "Action & Adventure" to listOf("Action", "Adventure", "War", "Western"),
+        "Comedy" to listOf("Comedy"),
+        "Drama" to listOf("Drama"),
+        "Horror" to listOf("Horror"),
+        "Sci-Fi & Fantasy" to listOf("Science Fiction", "Fantasy"),
+        "Thriller & Crime" to listOf("Thriller", "Crime", "Mystery"),
+        "Romance" to listOf("Romance"),
+        "Documentary" to listOf("Documentary"),
+        "Animation & Family" to listOf("Animation", "Family")
     )
 
     private val singleTvCategories = mapOf(
@@ -60,9 +72,15 @@ class ArrowNetMovieTVProvider : MainAPI() {
     override val mainPage = mainPageOf(
         *singleMovieCategories.keys.map { "movie_$it" to it }.toTypedArray(),
         *combinedMovieCategories.keys.map { "movie_$it" to it }.toTypedArray(),
+        *genreMovieCategories.keys.map { "movie_$it" to it }.toTypedArray(),
         *singleTvCategories.keys.map { "tv_$it" to it }.toTypedArray(),
         *combinedTvCategories.keys.map { "tv_$it" to it }.toTypedArray()
     )
+
+    private fun getPrimaryGenre(movie: MovieData): String {
+        val genre = (movie.MovieGenre ?: "").trim().trimEnd(',')
+        return if (genre.isNotBlank()) genre.split(",")[0].trim() else ""
+    }
 
     override suspend fun getMainPage(
         page: Int,
@@ -74,32 +92,78 @@ class ArrowNetMovieTVProvider : MainAPI() {
 
         val results = when {
             data.startsWith("movie_") -> {
-                val apiCategories = combinedMovieCategories[displayName]
-                    ?: listOf(singleMovieCategories[displayName] ?: displayName)
-                val allMovies = mutableListOf<MovieData>()
-                for (cat in apiCategories) {
-                    val json = app.get(
-                        "$apiBaseUrl/movies.php?category=$cat&sort_by=uploadTime+DESC&limit=$limit",
-                        verify = false,
-                        cacheTime = 60
-                    ).body?.string() ?: ""
-                    try { allMovies.addAll(AppUtils.parseJson(json)) } catch (_: Exception) {}
+                when {
+                    // Genre-filtered: fetch Hollywood and filter by primary genre
+                    genreMovieCategories.containsKey(displayName) -> {
+                        val matchGenres = genreMovieCategories[displayName]!!
+                        val json = app.get(
+                            "$apiBaseUrl/movies.php?category=Hollywood&sort_by=uploadTime+DESC&limit=$limit",
+                            verify = false,
+                            cacheTime = 60
+                        ).body?.string() ?: ""
+                        val movies: List<MovieData> = try {
+                            AppUtils.parseJson(json)
+                        } catch (_: Exception) { emptyList() }
+                        movies.filter { getPrimaryGenre(it) in matchGenres }
+                            .mapNotNull { toMovieSearchResult(it) }
+                    }
+                    // Combined: fetch from multiple API categories and merge
+                    combinedMovieCategories.containsKey(displayName) -> {
+                        val apiCategories = combinedMovieCategories[displayName]!!
+                        val allMovies = mutableListOf<MovieData>()
+                        for (cat in apiCategories) {
+                            val json = app.get(
+                                "$apiBaseUrl/movies.php?category=$cat&sort_by=uploadTime+DESC&limit=$limit",
+                                verify = false,
+                                cacheTime = 60
+                            ).body?.string() ?: ""
+                            try { allMovies.addAll(AppUtils.parseJson(json)) } catch (_: Exception) {}
+                        }
+                        allMovies.mapNotNull { toMovieSearchResult(it) }
+                    }
+                    // Single: fetch from one API category
+                    else -> {
+                        val apiCat = singleMovieCategories[displayName] ?: displayName
+                        val json = app.get(
+                            "$apiBaseUrl/movies.php?category=$apiCat&sort_by=uploadTime+DESC&limit=$limit",
+                            verify = false,
+                            cacheTime = 60
+                        ).body?.string() ?: ""
+                        val movies: List<MovieData> = try {
+                            AppUtils.parseJson(json)
+                        } catch (_: Exception) { emptyList() }
+                        movies.mapNotNull { toMovieSearchResult(it) }
+                    }
                 }
-                allMovies.mapNotNull { toMovieSearchResult(it) }
             }
             data.startsWith("tv_") -> {
-                val apiCategories = combinedTvCategories[displayName]
-                    ?: listOf(singleTvCategories[displayName] ?: displayName)
-                val allTvShows = mutableListOf<TvShowData>()
-                for (cat in apiCategories) {
-                    val json = app.get(
-                        "$apiBaseUrl/tvshows.php?category=$cat&limit=$limit&sort_by=uploadTime+DESC",
-                        verify = false,
-                        cacheTime = 60
-                    ).body?.string() ?: ""
-                    try { allTvShows.addAll(AppUtils.parseJson(json)) } catch (_: Exception) {}
+                when {
+                    combinedTvCategories.containsKey(displayName) -> {
+                        val apiCategories = combinedTvCategories[displayName]!!
+                        val allTvShows = mutableListOf<TvShowData>()
+                        for (cat in apiCategories) {
+                            val json = app.get(
+                                "$apiBaseUrl/tvshows.php?category=$cat&limit=$limit&sort_by=uploadTime+DESC",
+                                verify = false,
+                                cacheTime = 60
+                            ).body?.string() ?: ""
+                            try { allTvShows.addAll(AppUtils.parseJson(json)) } catch (_: Exception) {}
+                        }
+                        allTvShows.mapNotNull { toTvShowSearchResult(it) }
+                    }
+                    else -> {
+                        val apiCat = singleTvCategories[displayName] ?: displayName
+                        val json = app.get(
+                            "$apiBaseUrl/tvshows.php?category=$apiCat&limit=$limit&sort_by=uploadTime+DESC",
+                            verify = false,
+                            cacheTime = 60
+                        ).body?.string() ?: ""
+                        val tvShows: List<TvShowData> = try {
+                            AppUtils.parseJson(json)
+                        } catch (_: Exception) { emptyList() }
+                        tvShows.mapNotNull { toTvShowSearchResult(it) }
+                    }
                 }
-                allTvShows.mapNotNull { toTvShowSearchResult(it) }
             }
             else -> emptyList()
         }
