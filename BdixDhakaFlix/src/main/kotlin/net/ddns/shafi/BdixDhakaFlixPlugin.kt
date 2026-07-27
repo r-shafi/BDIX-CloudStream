@@ -1,0 +1,16 @@
+package net.ddns.shafi
+
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
+import android.content.Context
+
+@CloudstreamPlugin
+class BdixDhakaFlixPlugin: Plugin() {
+    override fun load(context: Context) {
+        registerMainAPI(BdixDhakaFlixCombinedProvider())
+        registerMainAPI(BdixDhakaFlix14Provider())
+        registerMainAPI(BdixDhakaFlix7Provider())
+        registerMainAPI(BdixDhakaFlix9Provider())
+        registerMainAPI(BdixDhakaFlix12Provider())
+    }
+}
