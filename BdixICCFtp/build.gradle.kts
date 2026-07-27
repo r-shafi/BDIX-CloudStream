@@ -2,7 +2,7 @@
 version = 2
 
 android {
-    namespace = "com.redowan"
+    namespace = "net.ddns.shafi"
 }
 
 cloudstream {

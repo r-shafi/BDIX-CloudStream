@@ -2,7 +2,7 @@
 version = 4
 
 android {
-    namespace = "com.redowan"
+    namespace = "net.ddns.shafi"
 }
 
 cloudstream {
@@ -36,4 +36,4 @@ cloudstream {
     )
     language = "bn"
 
-    iconUrl = "https://raw.githubusercontent.com/redowan99/Redowan-CloudStream/refs/heads/master/BdixDhakaFlix/icon.jpg"}
+    iconUrl = "https://raw.githubusercontent.com/r-shafi/BDIX-CloudStream/refs/heads/master/BdixDhakaFlix/icon.jpg"}
