@@ -42,7 +42,9 @@ jobs:
           distribution: 'adopt'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
