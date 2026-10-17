@@ -81,9 +81,13 @@ class SrzoneLiveTVProvider : MainAPI() {
         val doc = app.get(url).document
         // The player config embeds a tokenized HLS url, e.g.
         // window.OvooVideojs.mount({"source":"http:\/\/cdn.srzone.live:8083\/btv\/index.m3u8?token=..."})
+        // cdn.srzone.live resolves to an ISP-internal BDIX mirror that does not serve the
+        // HLS port (:8083) on every network, so always use the public CDN host instead.
+        // The token is not host-bound and stays valid for ~3h, so it works there too.
         val source = sourceRegex.find(doc.html())
             ?.groupValues?.get(1)
             ?.replace("\\/", "/")
+            ?.replace("cdn.srzone.live", "cdn1.srzone.live")
             ?.takeIf { it.startsWith("http") }
             .orEmpty()
         val name = doc.selectFirst("meta[property=\"og:title\"]")?.attr("content")?.trim()
