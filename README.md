@@ -41,7 +41,7 @@ Alternative: manually download the `.cs3` plugin files from the [builds branch](
 
 ## Provider Guide
 
-Seven plugin modules provide access to different BDIX media servers:
+The plugin modules provide access to different BDIX media servers:
 
 ### 1. DhakaFlix (v4)
 
@@ -89,19 +89,12 @@ Seven plugin modules provide access to different BDIX media servers:
 - **Features:** Live channels by category, HLS (.m3u8) streaming with token auth, fuzzy search
 - **Also includes:** IpTvIDN sub-provider (`iptvidn.com`)
 
-### 6. ArrowNet Live TV
+### 6. SRZone Live TV
 
 - **Type:** Live TV
-- **Source:** `10.10.230.182:8080`
-- **Channels:** 5 hardcoded Bangladeshi live TV channels
-- **Search:** By channel name
-
-### 7. ArrowNet Movies & TV
-
-- **Type:** Movies, TV Series
-- **Source:** REST API at `103.142.80.21/api/v1`
-- **Features:** 15+ categories, TMDb poster integration, grouped episodes
-- **Download:** Supported
+- **Source:** `srzone.live` with tokenized HLS (.m3u8) streams from `cdn.srzone.live`
+- **Features:** 8 channel rows (Featured, All, Sports, Entertainment, Bangla, Indian Bangla, General, Indian), 58+ channels with logos, fuzzy search
+- **Note:** Streams are served from a BDIX-internal CDN, so an active BDIX connection is required
 
 ---
 
@@ -139,7 +132,7 @@ Every push to `master` automatically builds via GitHub Actions and publishes art
 
 ### Streams won't load
 
-- Live TV providers (BDIP TV, ArrowNet Live TV) require an active BDIX connection to the streaming server.
+- Live TV providers (BDIP TV, SRZone Live TV) require an active BDIX connection to the streaming server.
 
 ### How do I update plugins?
 
